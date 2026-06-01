@@ -22,3 +22,6 @@ Desktop.ini
 *.tmp
 *.log
 push-to-github.bat
+*.ps1
+*.bat
+
