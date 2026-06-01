@@ -66,10 +66,29 @@ jobs:
           name: ai-flashcard-apk
           path: ai-flashcard.apk
 
-      - name: Create Release
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: "AI Flashcard ${{ github.ref_name }}"
           files: ai-flashcard.apk
           generate_release_notes: true
+
+      - name: Sync APK to Gitee Release
+        if: startsWith(github.ref, 'refs/tags/') && env.GITEE_TOKEN != ''
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          # Create release on Gitee
+          RELEASE=$(curl -s -X POST "https://gitee.com/api/v5/repos/nanchang-university_7_0/flashcard/releases" \
+            -H "Content-Type: application/json" \
+            -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"${{ github.ref_name }}\",\"name\":\"AI Flashcard ${{ github.ref_name }}\",\"body\":\"自动构建 APK，下载后安装即可\"}")
+          echo "Release: $RELEASE"
+          # Upload APK
+          ID=$(echo "$RELEASE" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+          if [ -n "$ID" ]; then
+            curl -s -X POST "https://gitee.com/api/v5/repos/nanchang-university_7_0/flashcard/releases/$ID/attach_files" \
+              -F "access_token=$GITEE_TOKEN" \
+              -F "file=@ai-flashcard.apk"
+            echo "APK uploaded to Gitee release #$ID"
+          fi
