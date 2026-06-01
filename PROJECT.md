@@ -1,13 +1,59 @@
 # 📇 AI 智能闪卡 — 项目文档
 
-## 当前状态
+## 🎯 项目全貌
 
-一个纯前端 HTML 工具（`flashcard.html`），拖入 Markdown 知识点文件，调用 AI（通义千问 / Claude / GPT）自动生成三种闪卡，在浏览器中背诵复习。
+### 线上地址
 
-### 已实现功能
+| 平台 | 仓库 | 网页版 | APK 下载 |
+|------|------|--------|----------|
+| **GitHub** | [microlyr/Flashcard](https://github.com/microlyr/Flashcard) | - | [Releases](https://github.com/microlyr/Flashcard/releases) |
+| **Gitee** | [nanchang-university_7_0/flashcard](https://gitee.com/nanchang-university_7_0/flashcard) | Gitee Pages（待开启） | [Releases](https://gitee.com/nanchang-university_7_0/flashcard/releases) |
+
+### 技术架构
+
+```
+flashcard.html (纯前端单文件)
+    │
+    ├── AI API（通义千问 / Claude / GPT）
+    │   └── 自动生成：挖空填空、问答题、选择题
+    │
+    ├── 存储：浏览器 localStorage
+    │   └── 多卡组管理 + 复习历史 + 薄弱点追踪
+    │
+    ├── Android APK
+    │   └── WebView 加载本地 HTML + GitHub Actions 自动构建
+    │
+    └── CI/CD
+        └── 打 tag → 构建 APK → 发布 GitHub + Gitee
+```
+
+### 发布流程
+
+```bash
+# 日常开发
+git add -A && git commit -m "xxx"
+git push origin main && git push gitee main
+
+# 发布新版本（自动触发 APK 构建 + 双平台发布）
+git tag v1.2
+git push origin v1.2 && git push gitee v1.2
+```
+
+---
+
+## ✅ 已实现功能
 
 - [x] **AI 智能生成** — 从原始笔记自动生成挖空填空、问答题、选择题
 - [x] **多 AI 支持** — 通义千问 Qwen（默认）、Anthropic Claude、OpenAI GPT、自定义兼容 API
+- [x] **知识点分块** — 长文档自动拆分，逐块调用 AI，合并去重
+- [x] **增量扩展** — 卡片上点"🔍 扩展"，围绕该知识点生成更多题目
+- [x] **多卡组管理** — 保存/切换/删除/导入/导出卡组（JSON 格式）
+- [x] **复习历史** — 每次标记自动记录，三级薄弱度评分
+- [x] **导出薄弱点** — 带薄弱等级标注导出为 Markdown
+- [x] **Android APK** — WebView 打包 + GitHub Actions 自动构建
+- [x] **双平台发布** — 打 tag 自动同步 GitHub + Gitee Releases
+- [x] **移动端粘贴** — 📋 粘贴文本，手机上直接输入知识点
+- [x] **MIT 开源**
 - [x] **API Key 管理** — 浏览器 localStorage 存储，弹窗引导配置
 - [x] **3D 翻转动效** — CSS 3D transform 翻转卡片
 - [x] **三种卡片类型**
@@ -136,17 +182,40 @@
 
 ```
 Flashcard/
-├── flashcard.html      # 主应用（单文件）
-├── PROJECT.md          # 本文档
-└── 示例知识点.md        # 测试用的 JS 知识点笔记
+├── flashcard.html                      # 主应用（纯前端单文件）
+├── 示例知识点.md                        # 测试用知识点笔记
+├── README.md                           # GitHub 主页说明
+├── PROJECT.md                          # 本文档（路线图）
+├── LICENSE                             # MIT 开源协议
+├── .gitignore
+├── .github/workflows/
+│   └── build-apk.yml                   # GitHub Actions 自动打包 + 双平台发布
+└── android/                            # Android WebView 项目
+    ├── settings.gradle.kts
+    ├── build.gradle.kts
+    ├── gradle/wrapper/
+    │   └── gradle-wrapper.properties
+    └── app/
+        ├── build.gradle.kts
+        └── src/main/
+            ├── AndroidManifest.xml
+            ├── java/com/flashcard/app/
+            │   └── MainActivity.java   # WebView + 文件选择器
+            ├── res/values/strings.xml
+            └── assets/                 # flashcard.html 在构建时复制到此
 ```
 
 ---
 
 ## 快速开始
 
-1. 用浏览器打开 `flashcard.html`
+### 网页版
+
+1. 下载 [`flashcard.html`](flashcard.html)，用浏览器打开
 2. 去 [阿里云百炼](https://bailian.console.aliyun.com/#/api-key) 创建 API Key
 3. 在弹窗中填入 Key（或点 ⚙️ 按钮手动配置）
-4. 拖拽 `示例知识点.md`（或你自己的笔记）到页面
-5. 等待 AI 生成卡片，开始背诵
+4. 拖入 `.md` 笔记 → AI 自动生成闪卡 → 开始背诵
+
+### Android APK
+
+从 [Releases](../../releases) 下载最新 APK，安装即可。手机端推荐用 **📋 粘贴文本** 功能输入知识点。
