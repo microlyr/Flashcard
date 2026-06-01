@@ -373,6 +373,23 @@
   <p style="font-size:0.78rem;margin-top:4px;color:#999">
     AI 将自动生成 <strong>挖空填空</strong>、<strong>问答题</strong>、<strong>选择题</strong> 三种闪卡
   </p>
+  <button id="btnPaste" style="margin-top:12px">📋 粘贴文本</button>
+</div>
+
+<!-- 粘贴文本弹窗 -->
+<div class="modal-overlay" id="pasteModal" style="display:none">
+  <div class="modal-box" style="max-width:500px">
+    <h3>📋 粘贴知识点内容</h3>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:12px">
+      将你的 Markdown 笔记粘贴到下方，AI 将自动生成闪卡
+    </p>
+    <textarea id="pasteTextarea" rows="10" style="width:100%;font-family:inherit;font-size:0.88rem;padding:12px;border:1px solid var(--border);border-radius:10px;resize:vertical"
+      placeholder="在此粘贴你的知识点笔记（Markdown 格式）..."></textarea>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn-primary" id="btnPasteGo">🤖 生成闪卡</button>
+      <button id="btnPasteClose">取消</button>
+    </div>
+  </div>
 </div>
 
 <!-- Loading -->
@@ -1633,6 +1650,28 @@ dom.uploadZone.addEventListener('click', (e) => {
   const cfg = getConfig();
   if (!cfg.apiKey) { showNoKeyModal(); return; }
   openFileDialog();
+});
+
+// 粘贴文本功能
+$('btnPaste').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('pasteModal').style.display = '';
+  $('pasteTextarea').focus();
+});
+$('btnPasteClose').addEventListener('click', () => {
+  $('pasteModal').style.display = 'none';
+});
+$('pasteModal').addEventListener('click', (e) => {
+  if (e.target === $('pasteModal')) $('pasteModal').style.display = 'none';
+});
+$('btnPasteGo').addEventListener('click', () => {
+  const text = $('pasteTextarea').value.trim();
+  if (!text) { alert('请先粘贴知识点内容'); return; }
+  const cfg = getConfig();
+  if (!cfg.apiKey) { showNoKeyModal(); return; }
+  $('pasteModal').style.display = 'none';
+  $('pasteTextarea').value = '';
+  generateCards(text, '粘贴文本');
 });
 
 // 拖拽
