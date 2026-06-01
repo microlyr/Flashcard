@@ -38,7 +38,7 @@ jobs:
       - name: Build Release APK
         run: |
           cd android
-          gradle assembleRelease
+          gradle :app:assembleRelease
 
       - name: Sign APK (debug keystore)
         run: |
