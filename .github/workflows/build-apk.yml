@@ -14,7 +14,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Copy HTML to assets
-        run: cp flashcard.html android/app/src/main/assets/flashcard.html
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp flashcard.html android/app/src/main/assets/flashcard.html
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
