@@ -80,15 +80,18 @@ jobs:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           # Create release on Gitee
-          RELEASE=$(curl -s -X POST "https://gitee.com/api/v5/repos/nanchang-university_7_0/flashcard/releases" \
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "https://gitee.com/api/v5/repos/nanchang-university_7_0/flashcard/releases" \
             -H "Content-Type: application/json" \
-            -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"${{ github.ref_name }}\",\"name\":\"AI Flashcard ${{ github.ref_name }}\",\"body\":\"自动构建 APK，下载后安装即可\"}")
-          echo "Release: $RELEASE"
+            -d "{\"access_token\":\"$GITEE_TOKEN\",\"tag_name\":\"${{ github.ref_name }}\",\"name\":\"AI Flashcard ${{ github.ref_name }}\",\"body\":\"自动构建 APK，下载后安装即可\",\"target_commitish\":\"main\"}")
+          echo "Response: $RESP"
           # Upload APK
-          ID=$(echo "$RELEASE" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+          ID=$(echo "$RESP" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
           if [ -n "$ID" ]; then
+            echo "Release created, ID=$ID. Uploading APK..."
             curl -s -X POST "https://gitee.com/api/v5/repos/nanchang-university_7_0/flashcard/releases/$ID/attach_files" \
               -F "access_token=$GITEE_TOKEN" \
               -F "file=@ai-flashcard.apk"
             echo "APK uploaded to Gitee release #$ID"
+          else
+            echo "Failed to create Gitee release. Check token permissions."
           fi
