@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir E:\\\\CodeBase\\\\Personal Work\\\\claude_deepseek\\\\Flashcard *)",
+      "Bash(/c/Windows/System32/cmd.exe *)",
+      "Bash(/c/Windows/explorer.exe *)",
+      "Bash(/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe *)"
+    ]
+  }
+}

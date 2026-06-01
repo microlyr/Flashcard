@@ -1,0 +1,1748 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📇 AI 智能闪卡 — 自动挖空 · 出题 · 背诵</title>
+<style>
+  :root {
+    --bg: #f5f3f0;
+    --card-bg: #fffef9;
+    --text: #2c2c2c;
+    --text-secondary: #6b6b6b;
+    --accent: #d4770a;
+    --accent-hover: #b86509;
+    --known: #5a9e6f;
+    --unknown: #c75b5b;
+    --cloze: #7c5cbf;
+    --qa: #3b82b6;
+    --choice: #d4770a;
+    --border: #e0dcd5;
+    --shadow: 0 2px 16px rgba(0,0,0,0.08);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Header ── */
+  header {
+    width: 100%; max-width: 760px;
+    padding: 20px 24px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+  }
+  h1 { font-size: 1.4rem; font-weight: 700; }
+  .header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── Buttons ── */
+  button {
+    font-family: inherit; font-size: 0.84rem; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 16px; cursor: pointer;
+    background: #fff; color: var(--text);
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+  }
+  button:hover { background: #faf9f5; border-color: #ccc; }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.5; pointer-events: none; }
+
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .btn-known { background: var(--known); color: #fff; border-color: var(--known); }
+  .btn-unknown { background: var(--unknown); color: #fff; border-color: var(--unknown); }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    width: 100%; max-width: 760px;
+    padding: 10px 24px 0;
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    font-size: 0.82rem; color: var(--text-secondary);
+  }
+  .stats-bar strong { color: var(--text); }
+  .progress-wrap { flex:1; min-width:100px; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:3px; transition:width 0.3s; }
+
+  /* ── Settings panel ── */
+  .settings-panel {
+    width: 100%; max-width: 760px; margin: 16px 24px 0;
+    background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px;
+  }
+  .settings-panel h3 { font-size: 1rem; margin-bottom: 12px; }
+  .settings-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .settings-row label { font-size: 0.82rem; color: var(--text-secondary); white-space: nowrap; }
+  .settings-row select, .settings-row input {
+    font-family: inherit; font-size: 0.84rem;
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: #fafaf8;
+  }
+  .settings-row input[type="password"] { flex: 1; min-width: 200px; }
+  .settings-row input[type="text"] { flex: 1; min-width: 200px; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    width: 100%; max-width: 760px; margin: 16px 24px;
+    padding: 40px 24px;
+    border: 2px dashed var(--border); border-radius: 16px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    color: var(--text-secondary);
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent); background: #fdfaf5; color: var(--accent);
+  }
+  .upload-zone .icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+  /* ── Loading spinner ── */
+  .loading-box {
+    width: 100%; max-width: 760px; margin: 16px 24px; padding: 40px;
+    text-align: center; color: var(--text-secondary);
+  }
+  .spinner {
+    width: 40px; height: 40px; margin: 0 auto 16px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Card ── */
+  .card-container {
+    width: 100%; max-width: 760px; padding: 20px 24px;
+    perspective: 1200px;
+  }
+
+  .card {
+    position: relative; width: 100%; min-height: 260px;
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
+    cursor: pointer;
+  }
+  .card.flipped { transform: rotateY(180deg); }
+
+  .card-face {
+    border-radius: 16px; background: var(--card-bg);
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+    padding: 32px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; gap: 12px;
+    min-height: 260px;
+  }
+
+  .card-front { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+
+  .card-back {
+    position: absolute; inset: 0;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    transform: rotateY(180deg);
+    overflow-y: auto;
+  }
+
+  .card-type-badge {
+    display: inline-block;
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
+    padding: 3px 10px; border-radius: 20px;
+    color: #fff; margin-bottom: 4px;
+  }
+  .type-cloze .card-type-badge { background: var(--cloze); }
+  .type-qa .card-type-badge { background: var(--qa); }
+  .type-choice .card-type-badge { background: var(--choice); }
+
+  .card-content {
+    font-size: 1.2rem; font-weight: 500; line-height: 1.7;
+    max-width: 100%; word-break: break-word;
+  }
+  .card-content .blank {
+    display: inline-block; min-width: 80px;
+    border-bottom: 2px dashed var(--cloze);
+    color: var(--cloze); font-weight: 700;
+    padding: 0 4px; margin: 0 2px;
+  }
+  .card-content .blank.revealed {
+    border-bottom-color: var(--known);
+    color: var(--known);
+    background: #eef7f1;
+    border-radius: 4px;
+  }
+
+  .card-content.markdown { text-align: left; font-size: 1.05rem; }
+  .card-content.markdown p { margin:6px 0; }
+  .card-content.markdown code {
+    background:#f3f1ed; padding:2px 6px; border-radius:4px; font-size:0.9em;
+  }
+  .card-content.markdown pre {
+    background:#f3f1ed; padding:12px; border-radius:8px;
+    overflow-x:auto; font-size:0.85em; text-align:left;
+  }
+
+  .choice-options {
+    display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px;
+  }
+  .choice-opt {
+    padding: 12px 16px; border: 2px solid var(--border); border-radius: 10px;
+    text-align: left; font-size: 0.95rem; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .choice-opt:hover { border-color: var(--accent); background: #fdfaf5; }
+  .choice-opt.selected { border-color: var(--accent); background: #fef5e7; }
+  .choice-opt.correct { border-color: var(--known); background: #eef7f1; }
+  .choice-opt.wrong { border-color: var(--unknown); background: #fdf0f0; }
+
+  .flip-hint { font-size: 0.78rem; color: #bbb; margin-top: 6px; }
+
+  /* ── Actions / Nav ── */
+  .card-actions {
+    display: flex; justify-content: center; gap: 12px;
+    padding: 0 24px; flex-wrap: wrap;
+  }
+  .nav-row {
+    display: flex; justify-content: center; align-items: center; gap: 16px;
+    padding: 12px 24px 24px;
+  }
+  .page-indicator { font-size: 0.84rem; color: var(--text-secondary); min-width: 60px; text-align: center; }
+
+  .kbd-hints {
+    display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+    font-size: 0.74rem; color: #bbb; padding: 0 24px 24px;
+  }
+  .kbd-hints kbd {
+    background:#e8e5df; border-radius:4px; padding:2px 6px;
+    font-family:inherit; font-size:0.68rem; border:1px solid #d5d1c9;
+  }
+
+  /* ── Complete ── */
+  .complete-state {
+    text-align: center; padding: 50px 24px;
+  }
+  .complete-state .icon { font-size: 4rem; margin-bottom: 10px; }
+  .complete-state h2 { margin-bottom: 8px; }
+  .complete-state p { color: var(--text-secondary); margin-bottom: 14px; }
+
+  .score-ring {
+    width: 100px; height: 100px; border-radius: 50%;
+    background: conic-gradient(var(--known) var(--pct), #eee var(--pct));
+    display: flex; align-items: center; justify-content: center;
+    margin: 14px auto;
+  }
+  .score-inner {
+    width: 76px; height: 76px; border-radius: 50%;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; font-weight: 700;
+  }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn 0.2s;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-box {
+    background: #fff; border-radius: 18px; padding: 32px;
+    max-width: 440px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    text-align: center; animation: slideUp 0.25s;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-box .icon { font-size: 3rem; margin-bottom: 12px; }
+  .modal-box h3 { margin-bottom: 8px; font-size: 1.15rem; }
+  .modal-box p { color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 16px; line-height: 1.5; }
+  .modal-box .btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  /* ── Deck bar ── */
+  .deck-bar {
+    width: 100%; max-width: 760px; margin: 12px 24px 0;
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 0.84rem;
+  }
+  .deck-bar .deck-label { color: var(--text-secondary); white-space: nowrap; }
+  .deck-bar select {
+    font-family: inherit; font-size: 0.84rem; font-weight: 600;
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: #fafaf8; cursor: pointer; min-width: 140px;
+  }
+  .deck-bar .btn-sm {
+    font-size: 0.78rem; padding: 5px 10px; border-radius: 7px;
+  }
+  .deck-bar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+  /* ── Weak indicator ── */
+  .weak-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 4px; vertical-align: middle;
+  }
+  .weak-dot.weak-1 { background: #f0c040; }
+  .weak-dot.weak-2 { background: #e88030; }
+  .weak-dot.weak-3 { background: #c75b5b; }
+  .weak-tag {
+    display: inline-block; font-size: 0.7rem; font-weight: 600;
+    padding: 2px 8px; border-radius: 10px; margin-left: 6px;
+  }
+  .weak-tag.weak-1 { background: #fef3cd; color: #856404; }
+  .weak-tag.weak-2 { background: #fde4d0; color: #a04020; }
+  .weak-tag.weak-3 { background: #fdd; color: #a02020; }
+
+  /* ── responsive ── */
+  @media (max-width: 500px) {
+    .card-face { padding: 22px; min-height: 220px; }
+    .card-content { font-size: 1.05rem; }
+    .card-actions button { flex:1; justify-content:center; }
+    header { flex-direction:column; align-items:flex-start; }
+    .settings-row { flex-direction:column; align-items:stretch; }
+    .modal-box { padding: 24px; }
+    .deck-bar { gap: 6px; padding: 8px 12px; }
+    .deck-bar select { min-width: 100px; }
+  }
+</style>
+</head>
+<body>
+
+<input type="file" id="fileInput" accept=".md,.txt,.markdown" style="display:none">
+
+<header>
+  <h1>📇 AI 智能闪卡</h1>
+  <div class="header-btns">
+    <button id="btnSettings">⚙️ API 设置</button>
+    <button id="btnLoad">📂 加载文件</button>
+    <button id="btnSample">✨ 示例</button>
+    <button id="btnReset">🔄 重置</button>
+    <button id="btnExport">📤 导出薄弱点</button>
+  </div>
+</header>
+
+<!-- 卡组管理栏 -->
+<div class="deck-bar" id="deckBar" style="display:none">
+  <span class="deck-label">📚 卡组</span>
+  <select id="deckSelect"><option value="">（空）</option></select>
+  <button class="btn-sm" id="btnSaveDeck" title="保存当前进度">💾 保存</button>
+  <button class="btn-sm" id="btnExportDeck" title="导出卡组为 JSON 文件">📤 导出</button>
+  <span class="sep"></span>
+  <button class="btn-sm" id="btnImportDeck" title="从 JSON 文件导入卡组">📥 导入</button>
+  <button class="btn-sm" id="btnDeleteDeck" title="删除当前卡组">🗑 删除</button>
+  <input type="file" id="importFileInput" accept=".json" style="display:none">
+</div>
+
+<!-- 设置面板 -->
+<div class="settings-panel" id="settingsPanel" style="display:none">
+  <h3>🔑 AI API 配置</h3>
+  <div class="settings-row" style="margin-bottom:10px">
+    <label>AI 服务</label>
+    <select id="providerSelect">
+      <option value="qwen">通义千问 (Qwen) — 推荐</option>
+      <option value="anthropic">Anthropic (Claude)</option>
+      <option value="openai">OpenAI (GPT)</option>
+      <option value="custom">自定义兼容 API</option>
+    </select>
+  </div>
+  <div class="settings-row" style="margin-bottom:10px">
+    <label>API Key</label>
+    <input type="password" id="apiKeyInput" placeholder="sk-...（通义千问 / OpenAI / Claude）">
+    <button id="btnSaveKey">💾 保存</button>
+  </div>
+  <div class="settings-row" id="customEndpointRow" style="display:none;margin-bottom:10px">
+    <label>API 地址</label>
+    <input type="text" id="customEndpoint" placeholder="https://api.openai.com/v1/chat/completions">
+  </div>
+  <div class="settings-row" id="customModelRow" style="display:none;margin-bottom:10px">
+    <label>模型名</label>
+    <input type="text" id="customModel" placeholder="gpt-4o">
+  </div>
+  <p style="font-size:0.75rem;color:#999;margin-top:4px">
+    API Key 仅保存在浏览器本地，不上传任何第三方。<br>
+    通义千问 Key 获取：<a href="https://bailian.console.aliyun.com/#/api-key" target="_blank" style="color:var(--accent)">阿里云百炼控制台</a> → 创建 API Key
+  </p>
+</div>
+
+<!-- 上传区 -->
+<div class="upload-zone" id="uploadZone">
+  <div class="icon">📄</div>
+  <p><strong>拖拽 .md 知识点文件到此处</strong></p>
+  <p>或点击此处选择文件</p>
+  <p style="font-size:0.78rem;margin-top:4px;color:#999">
+    AI 将自动生成 <strong>挖空填空</strong>、<strong>问答题</strong>、<strong>选择题</strong> 三种闪卡
+  </p>
+</div>
+
+<!-- Loading -->
+<div class="loading-box" id="loadingBox" style="display:none">
+  <div class="spinner"></div>
+  <p id="loadingText">🤖 AI 正在分析知识点，生成智能闪卡...</p>
+  <p style="font-size:0.78rem;color:#999" id="loadingDetail"></p>
+</div>
+
+<!-- 统计栏 -->
+<div class="stats-bar" id="statsBar" style="display:none">
+  <span>📝 <strong id="statTotal">0</strong> 张</span>
+  <span>✅ <strong id="statKnown">0</strong> 掌握</span>
+  <span>🔄 <strong id="statRemain">0</strong> 剩余</span>
+  <span style="font-size:0.74rem">
+    🔤<strong id="statCloze">0</strong>
+    ❓<strong id="statQA">0</strong>
+    📋<strong id="statChoice">0</strong>
+  </span>
+  <div class="progress-wrap">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  </div>
+</div>
+
+<!-- 卡片区 -->
+<div class="card-container" id="cardContainer" style="display:none">
+  <div class="card" id="card">
+    <div class="card-face card-front" id="cardFront">
+      <div class="card-type-badge" id="frontBadge"></div>
+      <div class="card-content" id="questionContent"></div>
+      <div class="choice-options" id="choiceOptions" style="display:none"></div>
+      <div class="flip-hint">点击卡片 / <kbd>Space</kbd> 翻转看答案</div>
+    </div>
+    <div class="card-face card-back">
+      <div class="card-type-badge" id="backBadge"></div>
+      <div class="card-content markdown" id="answerContent"></div>
+      <div class="flip-hint" style="margin-top:12px">答案已显示</div>
+    </div>
+  </div>
+</div>
+
+<div class="card-actions" id="cardActions" style="display:none">
+  <button class="btn-unknown" id="btnForgot">❌ 没想起来</button>
+  <button class="btn-known" id="btnKnew">✅ 我会了</button>
+  <button id="btnExpand" title="围绕此知识点生成更多卡片" style="font-size:0.78rem">🔍 扩展</button>
+</div>
+
+<div class="nav-row" id="navRow" style="display:none">
+  <button id="btnPrev">◀ 上一张</button>
+  <span class="page-indicator" id="pageIndicator">1 / 1</span>
+  <button id="btnNext">下一张 ▶</button>
+</div>
+
+<div class="kbd-hints" id="kbdHints" style="display:none">
+  <span><kbd>←</kbd><kbd>→</kbd> 切换</span>
+  <span><kbd>Space</kbd> 翻转 / 选答案</span>
+  <span><kbd>K</kbd> 我会了</span>
+  <span><kbd>F</kbd> 没想起来</span>
+</div>
+
+<!-- 完成 -->
+<div class="complete-state" id="completeState" style="display:none">
+  <div class="icon">🎉</div>
+  <h2>本轮复习完成！</h2>
+  <p id="completeSummary"></p>
+  <div class="score-ring" id="scoreRing" style="--pct:0%">
+    <div class="score-inner" id="scoreText">0%</div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+    <button class="btn-primary" id="btnReviewWeak">🔁 复习薄弱卡片</button>
+    <button id="btnReset2">🔄 重新开始全部</button>
+  </div>
+</div>
+
+<!-- Modal: 未配置 API Key -->
+<div class="modal-overlay" id="noKeyModal" style="display:none">
+  <div class="modal-box">
+    <div class="icon">🔑</div>
+    <h3>需要配置 AI API Key</h3>
+    <p>使用通义千问 (Qwen)、Claude 或 GPT 的 API Key 才能智能生成闪卡。<br>Key 仅保存在你的浏览器本地。</p>
+    <p style="font-size:0.8rem;color:#999">
+      获取 Qwen Key → <a href="https://bailian.console.aliyun.com/#/api-key" target="_blank" style="color:var(--accent)">阿里云百炼控制台</a>
+    </p>
+    <div class="btn-row">
+      <button class="btn-primary" id="btnOpenSettings">⚙️ 去配置</button>
+      <button id="btnCloseModal">以后再说</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  AI 智能闪卡 — 自动从知识点生成挖空/问答/选择题
+// ═══════════════════════════════════════════════════════════
+
+const $ = id => document.getElementById(id);
+const FC_DECKS_KEY = 'fc_decks';      // { [deckId]: deckObject }
+const FC_ACTIVE_KEY = 'fc_active';    // deckId
+const FC_CONFIG_KEY = 'fc_config';    // { provider, apiKey, endpoint, model }
+
+// ── 全局状态（卡组模式）──
+// deck = { id, name, sourceFile, createdAt, cards[], progress:{order,currentIndex,flipped,results}, reviewLog[] }
+let deck = null;         // 当前卡组
+let activeDeckId = null; // 当前卡组 ID
+let choiceSelected = null;
+
+// ── DOM ──
+const dom = {
+  settingsPanel: $('settingsPanel'),
+  uploadZone: $('uploadZone'),
+  loadingBox: $('loadingBox'),
+  loadingText: $('loadingText'),
+  loadingDetail: $('loadingDetail'),
+  cardContainer: $('cardContainer'),
+  card: $('card'),
+  cardFront: $('cardFront'),
+  questionContent: $('questionContent'),
+  choiceOptions: $('choiceOptions'),
+  answerContent: $('answerContent'),
+  frontBadge: $('frontBadge'),
+  backBadge: $('backBadge'),
+  cardActions: $('cardActions'),
+  navRow: $('navRow'),
+  kbdHints: $('kbdHints'),
+  statsBar: $('statsBar'),
+  statTotal: $('statTotal'),
+  statKnown: $('statKnown'),
+  statRemain: $('statRemain'),
+  progressFill: $('progressFill'),
+  pageIndicator: $('pageIndicator'),
+  completeState: $('completeState'),
+  completeSummary: $('completeSummary'),
+  scoreRing: $('scoreRing'),
+  scoreText: $('scoreText'),
+  fileInput: $('fileInput'),
+  noKeyModal: $('noKeyModal'),
+  // 卡组管理
+  deckBar: $('deckBar'),
+  deckSelect: $('deckSelect'),
+  importFileInput: $('importFileInput'),
+};
+
+// ═══════════════════════════════════════
+//  API 配置
+// ═══════════════════════════════════════
+
+function getConfig() {
+  try {
+    return JSON.parse(localStorage.getItem(FC_CONFIG_KEY)) || {};
+  } catch(e) { return {}; }
+}
+
+function saveConfig(cfg) {
+  localStorage.setItem(FC_CONFIG_KEY, JSON.stringify(cfg));
+}
+
+function getApiKey() {
+  return getConfig().apiKey || '';
+}
+
+function getProvider() {
+  return getConfig().provider || 'qwen';
+}
+
+// 加载配置到 UI
+(function loadConfigUI() {
+  const cfg = getConfig();
+  if (cfg.apiKey) $('apiKeyInput').value = cfg.apiKey;
+  if (cfg.provider) $('providerSelect').value = cfg.provider;
+  if (cfg.endpoint) $('customEndpoint').value = cfg.endpoint;
+  if (cfg.model) $('customModel').value = cfg.model;
+  updateProviderUI();
+})();
+
+function updateProviderUI() {
+  const p = $('providerSelect').value;
+  // Qwen 和自定义 API 显示地址/模型
+  $('customEndpointRow').style.display = (p === 'qwen' || p === 'custom') ? '' : 'none';
+  $('customModelRow').style.display = (p === 'qwen' || p === 'custom') ? '' : 'none';
+
+  // 预设不同服务的地址和模型
+  if (p === 'qwen') {
+    if (!$('customEndpoint').value || $('customEndpoint').value.includes('api.openai.com')) {
+      $('customEndpoint').value = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+    }
+    if (!$('customModel').value || $('customModel').value === 'gpt-4o') {
+      $('customModel').value = 'qwen-plus';
+    }
+    $('customEndpoint').placeholder = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+    $('customModel').placeholder = 'qwen-plus / qwen-max / qwen-turbo';
+  } else if (p === 'custom') {
+    $('customEndpoint').placeholder = 'https://api.openai.com/v1/chat/completions';
+    $('customModel').placeholder = 'gpt-4o';
+  }
+}
+
+$('providerSelect').addEventListener('change', updateProviderUI);
+
+$('btnSaveKey').addEventListener('click', () => {
+  const cfg = {
+    provider: $('providerSelect').value,
+    apiKey: $('apiKeyInput').value.trim(),
+    endpoint: $('customEndpoint').value.trim(),
+    model: $('customModel').value.trim(),
+  };
+  if (!cfg.apiKey) { alert('请输入 API Key'); return; }
+  saveConfig(cfg);
+  dom.settingsPanel.style.display = 'none';
+  dom.noKeyModal.style.display = 'none';
+  alert('✅ API 配置已保存！');
+});
+
+$('btnSettings').addEventListener('click', () => {
+  const panel = dom.settingsPanel;
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  // 关闭弹窗
+  dom.noKeyModal.style.display = 'none';
+});
+
+// Modal
+function showNoKeyModal() {
+  dom.noKeyModal.style.display = '';
+}
+$('btnOpenSettings').addEventListener('click', () => {
+  dom.noKeyModal.style.display = 'none';
+  dom.settingsPanel.style.display = '';
+});
+$('btnCloseModal').addEventListener('click', () => {
+  dom.noKeyModal.style.display = 'none';
+});
+dom.noKeyModal.addEventListener('click', (e) => {
+  if (e.target === dom.noKeyModal) dom.noKeyModal.style.display = 'none';
+});
+
+// ═══════════════════════════════════════
+//  AI 调用
+// ═══════════════════════════════════════
+
+const SYSTEM_PROMPT = `你是一个专业的学习闪卡生成器。用户会给你一段知识点笔记（Markdown 格式），你需要从中提取关键信息，生成三种类型的闪卡。
+
+要求：
+1. **挖空填空 (cloze)**：识别最重要的概念、术语、关键词，用 ______ 替换。一道卡片只挖 1-2 个空。
+2. **问答题 (qa)**：根据知识点出简答题。问题要具体，答案要简洁准确。
+3. **选择题 (choice)**：出 4 选 1 的选择题，3 个干扰项要有迷惑性但不明显错误。
+
+数量分配（总共约 8-15 张卡）：
+- cloze: 40%
+- qa: 35%
+- choice: 25%
+
+**严格按照以下 JSON 格式返回，不要输出其他内容：**
+{
+  "cards": [
+    {"type": "cloze", "front": "包含 ______ 的句子，用 ______ 表示挖空", "back": "第一个空的答案，第二个空的答案"},
+    {"type": "qa", "front": "问题？", "back": "答案（支持 Markdown）"},
+    {"type": "choice", "front": "题目？", "options": ["选项A内容", "选项B内容", "选项C内容", "选项D内容"], "answer": 0}
+  ]
+}
+
+注意：
+- front 中挖空用 ______（6 个下划线）
+- choice 的 answer 是正确选项的索引（0-3）
+- **choice 的 options 不要加 A. B. C. D. 等字母前缀，系统会自动添加**
+- 每张卡的 front 要清晰、独立、可理解
+- 覆盖原文的重要知识点，不要遗漏核心概念
+- 如果知识点较少（少于 3 个），按比例减少卡片总数`;
+
+async function callAI(markdownContent, isMultiChunk = false) {
+  const cfg = getConfig();
+  if (!cfg.apiKey) throw new Error('请先配置 API Key（点击 ⚙️ API 设置）');
+
+  const provider = cfg.provider || 'qwen';
+  const prefix = isMultiChunk
+    ? '以下是一份文档的一个分块。请仅根据本块内容生成闪卡（3-6 张即可），不要重复其他块已覆盖的知识点。\n\n'
+    : '请根据以下知识点生成闪卡：\n\n';
+  const userMsg = prefix + markdownContent;
+
+  if (provider === 'anthropic') {
+    return callAnthropic(cfg.apiKey, userMsg);
+  } else if (provider === 'qwen') {
+    const endpoint = cfg.endpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+    const model = cfg.model || 'qwen-plus';
+    return callOpenAI(cfg.apiKey, userMsg, endpoint, model);
+  } else if (provider === 'openai') {
+    return callOpenAI(cfg.apiKey, userMsg, 'https://api.openai.com/v1/chat/completions', 'gpt-4o');
+  } else {
+    const endpoint = cfg.endpoint || 'https://api.openai.com/v1/chat/completions';
+    const model = cfg.model || 'gpt-4o';
+    return callOpenAI(cfg.apiKey, userMsg, endpoint, model);
+  }
+}
+
+async function callAnthropic(apiKey, userMessage) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`Anthropic API 错误 (${resp.status}): ${err.error?.message || resp.statusText}`);
+  }
+
+  const data = await resp.json();
+  const text = data.content[0].text;
+  return extractJSON(text);
+}
+
+async function callOpenAI(apiKey, userMessage, endpoint, model, systemPrompt = null) {
+  const sysPrompt = systemPrompt || SYSTEM_PROMPT;
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      max_tokens: 4096,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`API 错误 (${resp.status}): ${err.error?.message || resp.statusText}`);
+  }
+
+  const data = await resp.json();
+  const text = data.choices[0].message.content;
+  return extractJSON(text);
+}
+
+function extractJSON(text) {
+  // 尝试直接解析
+  let cleaned = text.trim();
+  // 去掉 markdown 代码块包装
+  const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) cleaned = jsonMatch[1].trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch(e) {
+    // 尝试找到第一个 { 到最后一个 }
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      cleaned = cleaned.slice(start, end + 1);
+      try { return JSON.parse(cleaned); } catch(e2) {}
+    }
+    throw new Error('AI 返回格式解析失败，请重试。原始返回: ' + text.slice(0, 200));
+  }
+}
+
+
+
+// ═══════════════════════════════════════
+//  卡组数据管理
+// ═══════════════════════════════════════
+
+function getAllDecks() {
+  try { return JSON.parse(localStorage.getItem(FC_DECKS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+
+function saveAllDecks(decks) {
+  localStorage.setItem(FC_DECKS_KEY, JSON.stringify(decks));
+}
+
+function persistDeck() {
+  if (!deck || !activeDeckId) return;
+  const decks = getAllDecks();
+  decks[activeDeckId] = deck;
+  saveAllDecks(decks);
+  localStorage.setItem(FC_ACTIVE_KEY, activeDeckId);
+  updateDeckSelect();
+}
+
+function createDeck(name, sourceFile, cards) {
+  const id = 'd' + Date.now();
+  const order = [...Array(cards.length).keys()];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  const d = {
+    id, name, sourceFile,
+    createdAt: new Date().toISOString(),
+    cards: cards,
+    progress: { order, currentIndex: 0, flipped: false, results: {} },
+    reviewLog: []
+  };
+  const decks = getAllDecks();
+  decks[id] = d;
+  saveAllDecks(decks);
+  deck = d;
+  activeDeckId = id;
+  localStorage.setItem(FC_ACTIVE_KEY, activeDeckId);
+  updateDeckSelect();
+  return d;
+}
+
+function loadDeck(deckId) {
+  const decks = getAllDecks();
+  const d = decks[deckId];
+  if (!d) return false;
+  deck = d;
+  activeDeckId = deckId;
+  localStorage.setItem(FC_ACTIVE_KEY, activeDeckId);
+  updateDeckSelect();
+  return true;
+}
+
+function deleteDeckFromStore(deckId) {
+  const decks = getAllDecks();
+  delete decks[deckId];
+  saveAllDecks(decks);
+  if (activeDeckId === deckId) {
+    deck = null;
+    activeDeckId = null;
+    localStorage.removeItem(FC_ACTIVE_KEY);
+  }
+  updateDeckSelect();
+}
+
+function updateDeckSelect() {
+  const decks = getAllDecks();
+  const ids = Object.keys(decks);
+  const sel = dom.deckSelect;
+  if (ids.length === 0) {
+    sel.innerHTML = '<option value="">（空）</option>';
+    dom.deckBar.style.display = 'none';
+  } else {
+    sel.innerHTML = ids.map(id => {
+      const d = decks[id];
+      const n = d.cards ? d.cards.length : 0;
+      return `<option value="${id}" ${id === activeDeckId ? 'selected' : ''}>${d.name || '未命名'} (${n}张)</option>`;
+    }).join('');
+    dom.deckBar.style.display = '';
+  }
+}
+
+// ═══════════════════════════════════════
+//  复习记录 & 薄弱点分析
+// ═══════════════════════════════════════
+
+function logReview(cardId, result) {
+  if (!deck) return;
+  if (!deck.reviewLog) deck.reviewLog = [];
+  deck.reviewLog.push({ cardId, result, ts: new Date().toISOString() });
+  if (deck.reviewLog.length > 500) deck.reviewLog = deck.reviewLog.slice(-500);
+}
+
+function getWeakScore(cardId) {
+  // 0=正常 1=轻微 2=薄弱 3=顽固
+  if (!deck || !deck.reviewLog) return 0;
+  const logs = deck.reviewLog.filter(l => l.cardId === cardId);
+  if (logs.length === 0) return 0;
+
+  let consecutiveFails = 0;
+  for (let i = logs.length - 1; i >= 0; i--) {
+    if (logs[i].result === 'unknown') consecutiveFails++;
+    else break;
+  }
+
+  const total = logs.length;
+  const failRate = logs.filter(l => l.result === 'unknown').length / total;
+
+  if (consecutiveFails >= 3) return 3;
+  if (consecutiveFails >= 2) return 2;
+  if (failRate > 0.5 && total >= 3) return 1;
+  return 0;
+}
+
+// ═══════════════════════════════════════
+//  知识点分块
+// ═══════════════════════════════════════
+
+const MAX_CHUNK_CHARS = 6000; // 每块最大字符数（中文约 = token 数）
+
+function splitIntoChunks(mdContent) {
+  // 如果文档较短，不分块
+  if (mdContent.length <= MAX_CHUNK_CHARS) return [mdContent];
+
+  const chunks = [];
+  // 按 ## 标题分割
+  const sections = mdContent.split(/(?=^## )/m);
+  let current = '';
+
+  for (const sec of sections) {
+    if (current && (current.length + sec.length > MAX_CHUNK_CHARS)) {
+      if (current.trim()) chunks.push(current.trim());
+      current = sec;
+    } else {
+      current += sec;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+
+  // 如果某个单块仍然太大，按 # 再分
+  const finalChunks = [];
+  for (const chunk of chunks) {
+    if (chunk.length <= MAX_CHUNK_CHARS) {
+      finalChunks.push(chunk);
+    } else {
+      const subSections = chunk.split(/(?=^# )/m);
+      let sub = '';
+      for (const ss of subSections) {
+        if (sub && (sub.length + ss.length > MAX_CHUNK_CHARS)) {
+          if (sub.trim()) finalChunks.push(sub.trim());
+          sub = ss;
+        } else {
+          sub += ss;
+        }
+      }
+      if (sub.trim()) finalChunks.push(sub.trim());
+    }
+  }
+
+  console.log(`📦 文档分块：${mdContent.length} 字符 → ${finalChunks.length} 块`);
+  return finalChunks.length > 0 ? finalChunks : [mdContent];
+}
+
+function deduplicateCards(cardList) {
+  const seen = new Set();
+  const result = [];
+  for (const c of cardList) {
+    // 标准化 front 用于比较：去空格、转小写
+    const key = c.front.replace(/\s+/g, '').toLowerCase().slice(0, 80);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(c);
+    }
+  }
+  const removed = cardList.length - result.length;
+  if (removed > 0) console.log(`🔁 去重：移除 ${removed} 张重复卡片`);
+  return result;
+}
+
+// ═══════════════════════════════════════
+//  文件处理 & 卡片生成
+// ═══════════════════════════════════════
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+async function generateCards(markdownContent, sourceFileName, appendToDeck = false) {
+  dom.loadingBox.style.display = '';
+  dom.uploadZone.style.display = 'none';
+  dom.deckBar.style.display = 'none';
+  dom.cardContainer.style.display = 'none';
+  dom.cardActions.style.display = 'none';
+  dom.navRow.style.display = 'none';
+  dom.kbdHints.style.display = 'none';
+
+  const chunks = splitIntoChunks(markdownContent);
+  const isMulti = chunks.length > 1;
+
+  dom.loadingText.textContent = isMulti
+    ? `🤖 AI 正在分析知识点（共 ${chunks.length} 块）...`
+    : '🤖 AI 正在分析知识点，生成智能闪卡...';
+  dom.loadingDetail.textContent = `文档长度：${markdownContent.length} 字符` + (isMulti ? `，分 ${chunks.length} 块处理` : '');
+
+  try {
+    let allCards = [];
+    let cardIdCounter = 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      if (isMulti) {
+        dom.loadingText.textContent = `🤖 正在处理第 ${i+1}/${chunks.length} 块知识点...`;
+        dom.loadingDetail.textContent = `块大小：${chunks[i].length} 字符`;
+      }
+
+      const result = await callAI(chunks[i], isMulti);
+      if (result.cards && Array.isArray(result.cards)) {
+        const mapped = result.cards.map(c => ({
+          id: 'c' + (cardIdCounter++),
+          type: c.type || 'qa',
+          front: c.front || '',
+          back: c.back || '',
+          options: c.options || [],
+          answer: typeof c.answer === 'number' ? c.answer : 0,
+        }));
+        allCards = allCards.concat(mapped);
+      }
+    }
+
+    if (allCards.length === 0) {
+      throw new Error('AI 未能生成有效卡片，请检查知识点内容或重试');
+    }
+
+    // 去重
+    allCards = deduplicateCards(allCards);
+    // 重新编号保证 ID 连续
+    allCards.forEach((c, i) => { c.id = 'c' + i; });
+
+    if (appendToDeck && deck) {
+      // 增量模式：追加到当前卡组
+      const startId = deck.cards.length;
+      allCards.forEach((c, i) => { c.id = 'c' + (startId + i); });
+      deck.cards = deck.cards.concat(allCards);
+      // 把新卡加入洗牌队列末尾
+      const newOrder = [...Array(allCards.length).keys()].map(i => startId + i);
+      for (let i = newOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
+      }
+      deck.progress.order = deck.progress.order.concat(newOrder);
+      persistDeck();
+      console.log(`➕ 增量追加 ${allCards.length} 张卡片，卡组共 ${deck.cards.length} 张`);
+    } else {
+      // 新建卡组
+      const name = sourceFileName ? sourceFileName.replace(/\.(md|txt|markdown)$/i, '') : '未命名卡组';
+      createDeck(name, sourceFileName || '', allCards);
+      console.log('✅ AI 生成了', allCards.length, '张闪卡:', allCards.map(c => c.type).join(', '));
+    }
+
+    dom.loadingBox.style.display = 'none';
+    dom.deckBar.style.display = '';
+    choiceSelected = null;
+    render();
+  } catch(err) {
+    dom.loadingBox.style.display = 'none';
+    dom.uploadZone.style.display = '';
+    alert('❌ 生成失败：' + err.message);
+    console.error(err);
+  }
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  const cfg = getConfig();
+  if (!cfg.apiKey) { showNoKeyModal(); return; }
+  try {
+    const content = await readFile(file);
+    await generateCards(content, file.name);
+  } catch(err) { alert('❌ ' + err.message); }
+}
+
+// ═══════════════════════════════════════
+//  状态 & 渲染
+// ═══════════════════════════════════════
+
+function remainingIndices() {
+  if (!deck || !deck.progress || !deck.progress.order) return [];
+  return deck.progress.order.filter(idx => deck.cards[idx] && !deck.progress.results[deck.cards[idx].id]);
+}
+
+function currentEntry() {
+  const rem = remainingIndices();
+  if (rem.length === 0) return null;
+  if (deck.progress.currentIndex >= rem.length) deck.progress.currentIndex = 0;
+  return { card: deck.cards[rem[deck.progress.currentIndex]], remaining: rem };
+}
+
+function renderMD(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+function render() {
+  if (!deck) {
+    dom.deckBar.style.display = 'none';
+    dom.cardContainer.style.display = 'none';
+    dom.cardActions.style.display = 'none';
+    dom.navRow.style.display = 'none';
+    dom.kbdHints.style.display = 'none';
+    dom.statsBar.style.display = 'none';
+    dom.completeState.style.display = 'none';
+    dom.uploadZone.style.display = '';
+    return;
+  }
+
+  const entry = currentEntry();
+  if (!entry) { showComplete(); return; }
+
+  const { card, remaining } = entry;
+  choiceSelected = null;
+
+  dom.uploadZone.style.display = 'none';
+  dom.loadingBox.style.display = 'none';
+  dom.completeState.style.display = 'none';
+  dom.cardContainer.style.display = '';
+  dom.cardActions.style.display = '';
+  dom.navRow.style.display = '';
+  dom.kbdHints.style.display = '';
+  dom.statsBar.style.display = '';
+  dom.deckBar.style.display = '';
+  dom.card.classList.remove('flipped');
+  deck.progress.flipped = false;
+
+  const weakScore = getWeakScore(card.id);
+  const weakLabels = { 1: '轻微薄弱', 2: '⚠️ 薄弱', 3: '🔴 顽固' };
+
+  dom.cardFront.className = 'card-face card-front type-' + card.type;
+
+  const typeLabels = { cloze: '🔤 挖空填空', qa: '❓ 问答题', choice: '📋 选择题' };
+  dom.frontBadge.innerHTML = (typeLabels[card.type] || card.type) +
+    (weakScore > 0 ? `<span class="weak-tag weak-${weakScore}">${weakLabels[weakScore]}</span>` : '');
+  dom.backBadge.textContent = typeLabels[card.type] || card.type;
+
+  // 前面
+  if (card.type === 'choice') {
+    dom.questionContent.innerHTML = renderMD(card.front);
+    dom.questionContent.style.display = '';
+    dom.choiceOptions.style.display = '';
+    dom.choiceOptions.innerHTML = card.options.map((opt, i) => {
+      const clean = opt.replace(/^[A-Da-d][.、．)）\s]\s*/, '');
+      return `<div class="choice-opt" data-idx="${i}">${String.fromCharCode(65+i)}. ${clean}</div>`;
+    }).join('');
+    dom.choiceOptions.querySelectorAll('.choice-opt').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (choiceSelected !== null) return;
+        choiceSelected = parseInt(el.dataset.idx);
+        el.classList.add('selected');
+        setTimeout(() => flipCard(), 400);
+      });
+    });
+  } else if (card.type === 'cloze') {
+    dom.questionContent.innerHTML = renderMD(card.front).replace(
+      /_{6,}/g, '<span class="blank">______</span>'
+    );
+    dom.questionContent.style.display = '';
+    dom.choiceOptions.style.display = 'none';
+  } else {
+    dom.questionContent.innerHTML = renderMD(card.front);
+    dom.questionContent.style.display = '';
+    dom.choiceOptions.style.display = 'none';
+  }
+
+  // 答案面
+  if (card.type === 'choice') {
+    const correct = (card.options[card.answer] || '').replace(/^[A-Da-d][.、．)）\s]\s*/, '');
+    dom.answerContent.innerHTML = `<strong>正确答案：${String.fromCharCode(65+card.answer)}. ${correct}</strong><br><br>${renderMD(card.back || '')}`;
+  } else {
+    dom.answerContent.innerHTML = renderMD(card.back);
+  }
+
+  dom.pageIndicator.textContent = `${deck.progress.currentIndex + 1} / ${remaining.length}`;
+  $('btnPrev').disabled = deck.progress.currentIndex === 0;
+  $('btnNext').disabled = deck.progress.currentIndex >= remaining.length - 1;
+
+  const total = deck.cards.length;
+  const known = Object.values(deck.progress.results).filter(r => r === 'known').length;
+  const remain = total - Object.keys(deck.progress.results).length;
+  dom.statTotal.textContent = total;
+  dom.statKnown.textContent = known;
+  dom.statRemain.textContent = remain;
+  dom.progressFill.style.width = (total ? Math.round(known/total*100) : 0) + '%';
+  $('statCloze').textContent = deck.cards.filter(c => c.type === 'cloze').length;
+  $('statQA').textContent = deck.cards.filter(c => c.type === 'qa').length;
+  $('statChoice').textContent = deck.cards.filter(c => c.type === 'choice').length;
+
+  persistDeck();
+}
+
+function showComplete() {
+  dom.cardContainer.style.display = 'none';
+  dom.cardActions.style.display = 'none';
+  dom.navRow.style.display = 'none';
+  dom.kbdHints.style.display = 'none';
+  dom.completeState.style.display = '';
+
+  if (!deck) return;
+  const total = deck.cards.length;
+  const known = Object.values(deck.progress.results).filter(r => r === 'known').length;
+  const weak = Object.values(deck.progress.results).filter(r => r === 'unknown').length;
+  const pct = total ? Math.round(known/total*100) : 0;
+  const stubborn = deck.cards.filter(c => getWeakScore(c.id) >= 2).length;
+
+  dom.scoreRing.style.setProperty('--pct', pct + '%');
+  dom.scoreText.textContent = pct + '%';
+  dom.completeSummary.innerHTML = `共 ${total} 张卡片：✅ 掌握 ${known} 张 | ❌ 薄弱 ${weak} 张` +
+    (stubborn > 0 ? `<br>🔴 顽固薄弱点（连续多次忘记）：${stubborn} 个` : '');
+  persistDeck();
+}
+
+// ═══════════════════════════════════════
+//  操作
+// ═══════════════════════════════════════
+
+function flipCard() {
+  const entry = currentEntry();
+  if (!entry) return;
+  deck.progress.flipped = !deck.progress.flipped;
+  dom.card.classList.toggle('flipped', deck.progress.flipped);
+
+  if (deck.progress.flipped && entry.card.type === 'cloze') {
+    dom.questionContent.querySelectorAll('.blank').forEach(el => el.classList.add('revealed'));
+  }
+  if (deck.progress.flipped && entry.card.type === 'choice') {
+    dom.choiceOptions.querySelectorAll('.choice-opt').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      if (idx === entry.card.answer) el.classList.add('correct');
+      else if (idx === choiceSelected && idx !== entry.card.answer) el.classList.add('wrong');
+      el.style.pointerEvents = 'none';
+    });
+  }
+  persistDeck();
+}
+
+function mark(result) {
+  const entry = currentEntry();
+  if (!entry) return;
+  deck.progress.results[entry.card.id] = result;
+  deck.progress.flipped = false;
+  choiceSelected = null;
+  logReview(entry.card.id, result);
+
+  const rem = remainingIndices();
+  if (rem.length === 0) { persistDeck(); render(); return; }
+  if (deck.progress.currentIndex >= rem.length) deck.progress.currentIndex = rem.length - 1;
+  persistDeck();
+  render();
+}
+
+function next() {
+  const rem = remainingIndices();
+  if (rem.length && deck.progress.currentIndex < rem.length - 1) {
+    deck.progress.currentIndex++;
+    deck.progress.flipped = false;
+    choiceSelected = null;
+    persistDeck();
+    render();
+  }
+}
+
+function prev() {
+  if (deck && deck.progress.currentIndex > 0) {
+    deck.progress.currentIndex--;
+    deck.progress.flipped = false;
+    choiceSelected = null;
+    persistDeck();
+    render();
+  }
+}
+
+function reset() {
+  if (!deck || !deck.cards.length) return;
+  if (!confirm('确定重新开始？当前进度将清除，但复习历史会保留用于薄弱点分析。')) return;
+  deck.progress.results = {};
+  deck.progress.currentIndex = 0;
+  deck.progress.flipped = false;
+  const order = [...Array(deck.cards.length).keys()];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  deck.progress.order = order;
+  choiceSelected = null;
+  persistDeck();
+  render();
+}
+
+function reviewWeak() {
+  if (!deck) return;
+  const weakIds = Object.entries(deck.progress.results).filter(([,r]) => r === 'unknown').map(([id]) => id);
+  if (!weakIds.length) { alert('没有薄弱卡片！🎉'); return; }
+  deck.cards = deck.cards.filter(c => weakIds.includes(c.id));
+  deck.progress.results = {};
+  deck.progress.currentIndex = 0;
+  deck.progress.flipped = false;
+  const order = [...Array(deck.cards.length).keys()];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  deck.progress.order = order;
+  choiceSelected = null;
+  persistDeck();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function exportWeak() {
+  if (!deck) return;
+  const weakIds = Object.entries(deck.progress.results).filter(([,r]) => r === 'unknown').map(([id]) => id);
+  if (!weakIds.length) { alert('没有薄弱卡片可导出！'); return; }
+  const list = deck.cards.filter(c => weakIds.includes(c.id));
+  let md = '# 📝 薄弱知识点复习清单\n\n';
+  md += `> 卡组：${deck.name}\n`;
+  md += `> 导出时间：${new Date().toLocaleString()}\n`;
+  md += `> 共 ${list.length} 个需要加强的知识点\n\n---\n\n`;
+  list.forEach((c, i) => {
+    const ws = getWeakScore(c.id);
+    const wm = ws >= 3 ? '🔴🔴🔴 ' : ws >= 2 ? '⚠️⚠️ ' : ws >= 1 ? '⚡ ' : '';
+    md += `## ${i+1}. ${wm}${c.front.replace(/_{6,}/g, '______')}\n\n`;
+    if (c.type === 'choice') {
+      md += `选项：${c.options.join(' / ')}\n\n`;
+      md += `答案：${String.fromCharCode(65+c.answer)}. ${c.options[c.answer]}\n\n`;
+    } else {
+      md += `答案：${c.back}\n\n`;
+    }
+    md += '---\n\n';
+  });
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '薄弱知识点_' + (deck.name || 'export') + '_' + new Date().toISOString().slice(0,10) + '.md';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════
+//  增量生成 — 围绕单张卡片扩展更多题目
+// ═══════════════════════════════════════
+
+const EXPAND_PROMPT = `你是一个专业的学习闪卡生成器。用户正在学习一张闪卡，觉得掌握不够牢固，需要围绕此知识点生成更多练习卡片。
+
+请基于用户提供的卡片内容，生成 3-5 张额外的闪卡（混合挖空填空、问答题、选择题），帮助用户从不同角度理解这个知识点。
+
+严格按照以下 JSON 格式返回，不要输出其他内容：
+{
+  "cards": [
+    {"type": "cloze", "front": "... ______ ...", "back": "答案"},
+    {"type": "qa", "front": "问题？", "back": "答案"},
+    {"type": "choice", "front": "题目？", "options": ["选项A内容","选项B内容","选项C内容","选项D内容"], "answer": 0}
+  ]
+}
+
+注意：
+- 题目要有新角度，不要和原卡片重复
+- 可以出更深入或更基础的变体
+- choice 的 options 不要加 A. B. C. D. 前缀
+- 挖空用 ______（6 个下划线）`;
+
+async function expandCard() {
+  const entry = currentEntry();
+  if (!entry || !deck) return;
+
+  const card = entry.card;
+  const cfg = getConfig();
+  if (!cfg.apiKey) { showNoKeyModal(); return; }
+
+  // 构建上下文：卡片类型 + 题目 + 答案
+  const typeNames = { cloze: '挖空填空题', qa: '问答题', choice: '选择题' };
+  let cardText = `【${typeNames[card.type] || card.type}】\n题目：${card.front}\n答案：${card.back}`;
+  if (card.type === 'choice') {
+    cardText += `\n选项：${card.options.join(' / ')}`;
+    cardText += `\n正确答案：${String.fromCharCode(65+card.answer)}. ${card.options[card.answer]}`;
+  }
+
+  dom.loadingBox.style.display = '';
+  dom.loadingText.textContent = '🔍 正在围绕此知识点生成更多练习...';
+  dom.loadingDetail.textContent = '生成 3-5 张新卡片';
+  dom.cardContainer.style.display = 'none';
+  dom.cardActions.style.display = 'none';
+  dom.navRow.style.display = 'none';
+  dom.kbdHints.style.display = 'none';
+
+  try {
+    const provider = cfg.provider || 'qwen';
+    let result;
+    const userMsg = `请围绕以下知识点生成更多练习卡片：\n\n${cardText}`;
+
+    if (provider === 'anthropic') {
+      // 用自定义 system prompt
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cfg.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048,
+          system: EXPAND_PROMPT,
+          messages: [{ role: 'user', content: userMsg }],
+        }),
+      });
+      if (!resp.ok) throw new Error(`API 错误 (${resp.status})`);
+      const data = await resp.json();
+      result = extractJSON(data.content[0].text);
+    } else {
+      const endpoint = provider === 'openai'
+        ? 'https://api.openai.com/v1/chat/completions'
+        : (cfg.endpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
+      const model = provider === 'openai' ? 'gpt-4o' : (cfg.model || 'qwen-plus');
+      result = await callOpenAI(cfg.apiKey, userMsg, endpoint, model, EXPAND_PROMPT);
+    }
+
+    if (!result.cards || !Array.isArray(result.cards) || result.cards.length === 0) {
+      throw new Error('AI 未能生成有效卡片');
+    }
+
+    // 追加到当前卡组
+    const startId = deck.cards.length;
+    const newCards = result.cards.map((c, i) => ({
+      id: 'c' + (startId + i),
+      type: c.type || 'qa',
+      front: c.front || '',
+      back: c.back || '',
+      options: c.options || [],
+      answer: typeof c.answer === 'number' ? c.answer : 0,
+    }));
+
+    // 去重（和现有卡片比较）
+    const existingKeys = new Set(deck.cards.map(c => c.front.replace(/\s+/g, '').toLowerCase().slice(0, 80)));
+    const uniqueNew = newCards.filter(c => !existingKeys.has(c.front.replace(/\s+/g, '').toLowerCase().slice(0, 80)));
+
+    if (uniqueNew.length === 0) {
+      throw new Error('生成的新卡片与现有卡片重复，请稍后重试');
+    }
+
+    // 重新编号
+    uniqueNew.forEach((c, i) => { c.id = 'c' + (startId + i); });
+    deck.cards = deck.cards.concat(uniqueNew);
+
+    // 洗牌加入队列
+    const newOrder = uniqueNew.map((_, i) => startId + i);
+    for (let i = newOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
+    }
+    deck.progress.order = deck.progress.order.concat(newOrder);
+    persistDeck();
+
+    console.log(`🔍 扩展生成 ${uniqueNew.length} 张新卡片（去重后），卡组共 ${deck.cards.length} 张`);
+    dom.loadingBox.style.display = 'none';
+    render();
+  } catch(err) {
+    dom.loadingBox.style.display = 'none';
+    render(); // 恢复卡片显示
+    alert('❌ 扩展失败：' + err.message);
+    console.error(err);
+  }
+}
+
+// ═══════════════════════════════════════
+//  卡组管理操作
+// ═══════════════════════════════════════
+
+function saveCurrentDeck() {
+  if (!deck) return;
+  const name = prompt('卡组名称：', deck.name || '');
+  if (!name) return;
+  deck.name = name;
+  persistDeck();
+  alert('✅ 卡组「' + name + '」已保存！');
+}
+
+function switchDeck() {
+  const id = dom.deckSelect.value;
+  if (!id || id === activeDeckId) return;
+  loadDeck(id);
+  choiceSelected = null;
+  render();
+}
+
+function deleteCurrentDeck() {
+  if (!deck || !activeDeckId) return;
+  if (!confirm(`确定删除卡组「${deck.name}」吗？\n\n此操作不可恢复！包含 ${deck.cards.length} 张卡片和所有复习记录。`)) return;
+  deleteDeckFromStore(activeDeckId);
+  deck = null;
+  activeDeckId = null;
+  choiceSelected = null;
+  updateDeckSelect();
+  render();
+}
+
+function exportDeckJSON() {
+  if (!deck) return;
+  const json = JSON.stringify(deck, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (deck.name || '卡组') + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importDeckJSON(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      if (!d.cards || !Array.isArray(d.cards)) throw new Error('无效的卡组文件（缺少 cards 字段）');
+      d.id = d.id || 'd' + Date.now();
+      d.progress = d.progress || { order: [], currentIndex: 0, flipped: false, results: {} };
+      d.reviewLog = d.reviewLog || [];
+      d.name = d.name || '导入的卡组';
+      d.sourceFile = d.sourceFile || '';
+      d.createdAt = d.createdAt || new Date().toISOString();
+      if (!d.progress.order || !d.progress.order.length) {
+        const order = [...Array(d.cards.length).keys()];
+        for (let i = order.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [order[i], order[j]] = [order[j], order[i]];
+        }
+        d.progress.order = order;
+      }
+
+      const decks = getAllDecks();
+      const dup = Object.values(decks).find(dd => dd.name === d.name);
+      if (dup) d.name = d.name + ' (' + new Date().toLocaleDateString() + ')';
+
+      decks[d.id] = d;
+      saveAllDecks(decks);
+      deck = d;
+      activeDeckId = d.id;
+      localStorage.setItem(FC_ACTIVE_KEY, activeDeckId);
+      choiceSelected = null;
+      updateDeckSelect();
+      dom.deckBar.style.display = '';
+      render();
+      alert(`✅ 已导入卡组「${d.name}」(${d.cards.length} 张卡片)`);
+    } catch(err) {
+      alert('❌ 导入失败：' + err.message);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function openFileDialog() {
+  dom.fileInput.click();
+}
+
+// ═══════════════════════════════════════
+//  示例数据
+// ═══════════════════════════════════════
+
+const SAMPLE_MD = `# JavaScript 核心概念
+
+## 什么是闭包（Closure）？
+闭包是指一个函数能够记住并访问它的词法作用域，即使这个函数在它的词法作用域之外被调用。闭包使得函数可以"记住"创建时的环境变量。
+
+## 解释事件循环（Event Loop）
+事件循环是 JavaScript 的异步执行机制。它不断地从任务队列中取出任务执行。
+- **微任务队列**（Microtask）：Promise.then、MutationObserver
+- **宏任务队列**（Macrotask）：setTimeout、setInterval、I/O
+执行顺序：同步代码 → 微任务 → 宏任务（每次一个宏任务后清空所有微任务）
+
+## 什么是原型链（Prototype Chain）？
+JavaScript 中每个对象都有一个内部属性 [[Prototype]]，指向它的原型对象。当访问一个对象的属性时，如果对象本身没有，就会沿着原型链向上查找，直到找到或到达 null。
+
+## var、let、const 的区别
+- **var**：函数作用域，可重新赋值，有变量提升（初始化为 undefined）
+- **let**：块级作用域，可重新赋值，有暂时性死区
+- **const**：块级作用域，不可重新赋值，有暂时性死区
+
+## 什么是防抖（Debounce）和节流（Throttle）？
+**防抖**：事件触发 n 秒后执行回调，若 n 秒内再次触发则重新计时。适合搜索框输入。
+**节流**：单位时间内只触发一次函数执行。适合滚动事件、resize。
+
+## 解释 this 的四种绑定规则
+1. **默认绑定**：独立调用 → this 指向全局（严格模式 undefined）
+2. **隐式绑定**：obj.foo() → this 指向 obj
+3. **显式绑定**：call / apply / bind → 明确指定 this
+4. **new 绑定**：new Foo() → this 指向新对象
+优先级：new > 显式 > 隐式 > 默认
+
+## 什么是 Promise？有哪些状态？
+Promise 是异步编程的解决方案。
+- **pending** → **fulfilled** 或 **rejected**，状态不可逆
+- .then() 返回新 Promise，支持链式调用
+- Promise.all / Promise.race / Promise.allSettled / Promise.any
+
+## HTTP 状态码分类
+- **1xx**：信息响应
+- **2xx**：成功（200 OK、201 Created、204 No Content）
+- **3xx**：重定向（301 永久、302 临时、304 未修改）
+- **4xx**：客户端错误（400、401、403、404）
+- **5xx**：服务端错误（500、502、503）
+
+## 什么是深拷贝和浅拷贝？
+**浅拷贝**：只复制引用，嵌套对象共享。方法：Object.assign、展开运算符
+**深拷贝**：递归复制所有层级，完全独立。方法：JSON.parse(JSON.stringify())、structuredClone()、手写递归
+
+## 什么是跨域？如何解决？
+浏览器同源策略限制不同源之间的资源访问。解决方案：
+1. **CORS**：服务端设置 Access-Control-Allow-Origin
+2. **JSONP**：利用 script 标签（仅 GET）
+3. **代理服务器**：开发环境 proxy 配置
+4. **postMessage**：跨窗口通信
+`;
+
+// ═══════════════════════════════════════
+//  示例数据加载
+// ═══════════════════════════════════════
+
+function loadSample() {
+  console.log('✨ 加载示例数据，调用 AI 生成...');
+  generateCards(SAMPLE_MD, 'JS 核心概念.md');
+}
+
+// ═══════════════════════════════════════
+//  事件绑定
+// ═══════════════════════════════════════
+
+dom.card.addEventListener('click', flipCard);
+
+$('btnLoad').addEventListener('click', openFileDialog);
+$('btnSample').addEventListener('click', loadSample);
+$('btnReset').addEventListener('click', reset);
+$('btnReset2').addEventListener('click', reset);
+$('btnReviewWeak').addEventListener('click', reviewWeak);
+$('btnExport').addEventListener('click', exportWeak);
+$('btnPrev').addEventListener('click', prev);
+$('btnNext').addEventListener('click', next);
+$('btnKnew').addEventListener('click', () => mark('known'));
+$('btnForgot').addEventListener('click', () => mark('unknown'));
+$('btnExpand').addEventListener('click', expandCard);
+
+// 卡组管理事件
+$('btnSaveDeck').addEventListener('click', saveCurrentDeck);
+$('btnExportDeck').addEventListener('click', exportDeckJSON);
+$('btnImportDeck').addEventListener('click', () => dom.importFileInput.click());
+$('btnDeleteDeck').addEventListener('click', deleteCurrentDeck);
+dom.deckSelect.addEventListener('change', switchDeck);
+dom.importFileInput.addEventListener('change', () => {
+  if (dom.importFileInput.files[0]) {
+    importDeckJSON(dom.importFileInput.files[0]);
+    dom.importFileInput.value = '';
+  }
+});
+
+dom.fileInput.addEventListener('change', () => {
+  if (dom.fileInput.files[0]) {
+    handleFile(dom.fileInput.files[0]);
+    dom.fileInput.value = '';
+  }
+});
+
+dom.uploadZone.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const cfg = getConfig();
+  if (!cfg.apiKey) { showNoKeyModal(); return; }
+  openFileDialog();
+});
+
+// 拖拽
+dom.uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); dom.uploadZone.classList.add('drag-over'); });
+dom.uploadZone.addEventListener('dragleave', () => dom.uploadZone.classList.remove('drag-over'));
+dom.uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dom.uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer?.files?.[0];
+  if (file) handleFile(file);
+});
+
+document.addEventListener('dragover', (e) => { e.preventDefault(); if (!deck) dom.uploadZone.classList.add('drag-over'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dom.uploadZone.classList.remove('drag-over');
+  if (!deck) {
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleFile(file);
+  }
+});
+
+// 键盘
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+  switch (e.key) {
+    case ' ': e.preventDefault(); flipCard(); break;
+    case 'ArrowRight': e.preventDefault(); next(); break;
+    case 'ArrowLeft': e.preventDefault(); prev(); break;
+    case 'k': case 'K': mark('known'); break;
+    case 'f': case 'F': mark('unknown'); break;
+  }
+});
+
+// ═══════════════════════════════════════
+//  启动
+// ═══════════════════════════════════════
+
+(function init() {
+  console.log('🚀 闪卡工具启动');
+
+  // 迁移旧版数据
+  (function migrate() {
+    const oldState = localStorage.getItem('ai_flashcard_state');
+    const oldConfig = localStorage.getItem('ai_flashcard_config');
+    if (oldState && !localStorage.getItem(FC_DECKS_KEY)) {
+      try {
+        const data = JSON.parse(oldState);
+        if (data.cards?.length) {
+          const order = [...Array(data.cards.length).keys()];
+          for (let i = order.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [order[i], order[j]] = [order[j], order[i]];
+          }
+          const d = {
+            id: 'd' + Date.now(),
+            name: '旧版数据迁移',
+            sourceFile: '',
+            createdAt: new Date().toISOString(),
+            cards: data.cards,
+            progress: data.state && data.state.order ? data.state : { order, currentIndex: 0, flipped: false, results: {} },
+            reviewLog: []
+          };
+          const decks = { [d.id]: d };
+          saveAllDecks(decks);
+          deck = d;
+          activeDeckId = d.id;
+          localStorage.setItem(FC_ACTIVE_KEY, d.id);
+          console.log('📦 已迁移旧版数据');
+        }
+      } catch(e) { /* ignore */ }
+      localStorage.removeItem('ai_flashcard_state');
+    }
+    if (oldConfig && !localStorage.getItem(FC_CONFIG_KEY)) {
+      try { localStorage.setItem(FC_CONFIG_KEY, oldConfig); } catch(e) {}
+      localStorage.removeItem('ai_flashcard_config');
+    }
+  })();
+
+  updateDeckSelect();
+
+  // 尝试恢复上次的卡组
+  const lastId = localStorage.getItem(FC_ACTIVE_KEY);
+  if (lastId && loadDeck(lastId)) {
+    const rem = remainingIndices();
+    if (rem.length === 0) {
+      showComplete();
+      dom.statsBar.style.display = '';
+      dom.uploadZone.style.display = 'none';
+      dom.deckBar.style.display = '';
+      const total = deck.cards.length;
+      const known = Object.values(deck.progress.results).filter(r => r === 'known').length;
+      dom.statTotal.textContent = total;
+      dom.statKnown.textContent = known;
+      dom.statRemain.textContent = 0;
+      dom.progressFill.style.width = (total ? Math.round(known/total*100) : 0) + '%';
+      $('statCloze').textContent = deck.cards.filter(c => c.type === 'cloze').length;
+      $('statQA').textContent = deck.cards.filter(c => c.type === 'qa').length;
+      $('statChoice').textContent = deck.cards.filter(c => c.type === 'choice').length;
+    } else {
+      dom.uploadZone.style.display = 'none';
+      dom.deckBar.style.display = '';
+      render();
+    }
+  } else {
+    updateDeckSelect();
+    if (!getConfig().apiKey) showNoKeyModal();
+  }
+})();
+</script>
+
+</body>
+</html>
