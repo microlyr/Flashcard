@@ -30,27 +30,26 @@ jobs:
           api-level: 34
           build-tools: '34.0.0'
 
-      - name: Install Gradle
+      - name: Setup Gradle 8.7
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gradle
+          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          sudo unzip -q gradle-8.7-bin.zip -d /opt/gradle
+          echo "/opt/gradle/gradle-8.7/bin" >> $GITHUB_PATH
+          /opt/gradle/gradle-8.7/bin/gradle --version
 
       - name: Build Release APK
         run: |
           cd android
           gradle :app:assembleRelease
 
-      - name: Sign APK (debug keystore)
+      - name: Collect APK
         run: |
-          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          if [ -z "$APK" ]; then
-            echo "APK not found, checking debug..."
-            APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
-          fi
-          echo "APK found: $APK"
+          # Find the built APK
+          APK=$(find android/app/build/outputs -name "*.apk" | head -1)
+          echo "APK: $APK"
           cp "$APK" ai-flashcard.apk
 
-          # Generate debug keystore for signing
+          # Generate debug keystore
           keytool -genkey -v \
             -keystore debug.keystore \
             -alias debug \
@@ -60,11 +59,11 @@ jobs:
             -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown" \
             -noprompt 2>/dev/null || true
 
-          # If an unsigned APK exists, sign it
-          UNSIGNED=$(find android/app/build/outputs/apk/release -name "*-unsigned.apk" | head -1)
+          # Sign if unsigned
+          UNSIGNED=$(find android/app/build/outputs -name "*-unsigned.apk" | head -1)
           if [ -n "$UNSIGNED" ]; then
             $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks debug.keystore --ks-pass pass:android "$UNSIGNED"
-            mv "$UNSIGNED" ai-flashcard.apk
+            cp "$UNSIGNED" ai-flashcard.apk
           fi
 
       - name: Upload APK Artifact
@@ -77,6 +76,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: "AI 智能闪卡 ${{ github.ref_name }}"
+          name: "AI Flashcard ${{ github.ref_name }}"
           files: ai-flashcard.apk
           generate_release_notes: true
